@@ -1,0 +1,19 @@
+[package]
+name = "mpqer"
+version = "0.1.0"
+authors = ["mori"]
+edition = "2018"
+
+[profile.release]
+lto = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+byteorder = "1"
+lazy_static = "1"
+err-derive = "0.1"
+hexdump = "0.1"
+byte-slice-cast = "0.3"
+flate2 = "1"
+bzip2 = "0.3"
