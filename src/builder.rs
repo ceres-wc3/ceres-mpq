@@ -210,7 +210,7 @@ impl MpqBuilder {
             let mut cursor = buf.as_mut_slice();
             for (block_index, (_, file)) in self.added_files.iter().enumerate() {
                 let block_entry = BlockTableEntry::new(
-                    file_offsets[block_index],
+                    file_offsets[block_index] - archive_start,
                     file_sizes[block_index],
                     file.contents.len() as u64,
                     MPQ_FILE_COMPRESS,

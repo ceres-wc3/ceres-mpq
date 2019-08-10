@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use byte_slice_cast::*;
 use lazy_static::lazy_static;
 
@@ -222,15 +224,13 @@ pub(crate) fn decode_mpq_block(
             decompressed.resize(decompressor.total_out() as usize, 0);
             buf = decompressed;
         }
-
-        hexdump::hexdump(&buf);
     }
 
     Ok(buf)
 }
 
 // TODO: Add support for multiple compression types
-pub(crate) fn compress_mpq_block(input: &[u8]) -> Vec<u8> {
+pub(crate) fn compress_mpq_block(input: &[u8]) -> Cow<[u8]> {
     let mut compressed: Vec<u8> = vec![0u8; input.len() + 1];
 
     let mut compressor = flate2::Compress::new(flate2::Compression::best(), true);
@@ -240,7 +240,10 @@ pub(crate) fn compress_mpq_block(input: &[u8]) -> Vec<u8> {
 
     compressed[0] = COMPRESSION_ZLIB;
 
-    compressed.truncate((compressor.total_out() + 1) as usize);
-
-    compressed
+    if (compressor.total_out() + 1) as usize >= input.len() {
+        Cow::Borrowed(input)
+    } else {
+        compressed.truncate((compressor.total_out() + 1) as usize);
+        Cow::Owned(compressed)
+    }
 }

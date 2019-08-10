@@ -7,6 +7,6 @@ pub(crate) mod seeker;
 pub(crate) mod tables;
 pub(crate) mod util;
 
-pub mod builder;
 pub mod archive;
+pub mod builder;
 pub mod error;

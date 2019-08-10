@@ -1,10 +1,10 @@
-use std::io::{Read, Write};
 use std::io::Error as IoError;
+use std::io::{Read, Write};
 
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 
-use super::error::MpqError;
 use super::consts::*;
+use super::error::MpqError;
 
 #[derive(Debug)]
 pub(crate) struct MpqFileHeader {
@@ -42,7 +42,7 @@ impl MpqFileHeader {
             hash_table_offset,
             hash_table_entries,
             block_table_offset,
-            block_table_entries
+            block_table_entries,
         }
     }
 
@@ -82,7 +82,7 @@ impl MpqFileHeader {
         writer.write_u32::<LE>(self.block_table_offset)?;
         writer.write_u32::<LE>(self.hash_table_entries)?;
         writer.write_u32::<LE>(self.block_table_entries)?;
-    
+
         Ok(())
     }
 }

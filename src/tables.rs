@@ -234,8 +234,6 @@ impl SectorOffsets {
             sector_count_from_size(block_entry.uncompressed_size, seeker.info().sector_size);
         let mut raw_data = seeker.read(block_entry.file_pos, (sector_count + 1) * 4)?;
 
-        hexdump::hexdump(&raw_data);
-
         if let Some(encryption_key) = encryption_key {
             decrypt_mpq_block(&mut raw_data, encryption_key);
         }
