@@ -28,8 +28,6 @@ impl<R: Read + Seek> MpqReader<R> {
     }
 
     pub fn read_file(&mut self, name: &str) -> Result<Vec<u8>, MpqError> {
-        println!("READING FILE: {}", name);
-
         // find the hash entry and use it to find the block entry
         let hash_entry = self
             .hash_table
