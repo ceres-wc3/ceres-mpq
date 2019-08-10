@@ -87,6 +87,36 @@ pub(crate) fn decrypt_mpq_block(data: &mut [u8], mut key: u32) {
     }
 }
 
+pub(crate) fn encrypt_mpq_block(data: &mut [u8], mut key: u32) {
+    let iterations = data.len() >> 2;
+
+    let mut key_secondary: u32 = 0xEEEE_EEEE;
+    let mut temp: u32;
+
+    // if the buffer is not aligned to u32s we need to truncate it
+    // this is ok because the last bytes that don't fit into the
+    // aligned slice are not encrypted
+    let u32_data = &mut data[..iterations * 4].as_mut_slice_of::<u32>().unwrap();
+
+    for i in 0..iterations {
+        key_secondary = key_secondary
+            .overflowing_add(CRYPTO_TABLE[(MPQ_HASH_KEY2_MIX + (key & 0xFF)) as usize])
+            .0;
+
+        temp = u32_data[i];
+        u32_data[i] ^= key.overflowing_add(key_secondary).0;
+
+        key = ((!key << 0x15).overflowing_add(0x1111_1111).0) | (key >> 0x0B);
+        key_secondary = temp
+            .overflowing_add(key_secondary)
+            .0
+            .overflowing_add(key_secondary << 5)
+            .0
+            .overflowing_add(3)
+            .0;
+    }
+}
+
 pub(crate) fn get_plain_name(input: &str) -> &[u8] {
     let bytes = input.as_bytes();
     let mut out = input.as_bytes();
@@ -119,10 +149,11 @@ pub(crate) fn calculate_file_key(
 /// This will try to perform the following two operations:
 /// 1) If `encryption_key` is specified, it will decrypt the block using
 /// that encryption key.
-/// 2) If `compressed_size` != `uncompressed_size`, it will try to decompress
+/// 2) If `input.len()` != `uncompressed_size`, it will try to decompress
 /// the block. MPQ supports multiple compression types, and the compression
 /// type used for a particular block is specified in the first byte of the block
 /// as a set of bitflags.
+// TODO: Add support for IMA ADCPM Mono/Stereo
 pub(crate) fn decode_mpq_block(
     input: &[u8],
     uncompressed_size: u64,
@@ -191,7 +222,25 @@ pub(crate) fn decode_mpq_block(
             decompressed.resize(decompressor.total_out() as usize, 0);
             buf = decompressed;
         }
+
+        hexdump::hexdump(&buf);
     }
 
     Ok(buf)
+}
+
+// TODO: Add support for multiple compression types
+pub(crate) fn compress_mpq_block(input: &[u8]) -> Vec<u8> {
+    let mut compressed: Vec<u8> = vec![0u8; input.len() + 1];
+
+    let mut compressor = flate2::Compress::new(flate2::Compression::best(), true);
+    compressor
+        .compress(input, &mut compressed[1..], flate2::FlushCompress::Finish)
+        .expect("compression failed");
+
+    compressed[0] = COMPRESSION_ZLIB;
+
+    compressed.truncate((compressor.total_out() + 1) as usize);
+
+    compressed
 }

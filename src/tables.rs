@@ -1,11 +1,13 @@
-use std::io::{Read, Seek};
+use std::io::Error as IoError;
+use std::io::{Read, Seek, Write};
 
-use byteorder::{ReadBytesExt, LE};
+use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 
 use super::consts::*;
 use super::crypto::*;
 use super::error::MpqError;
 use super::seeker::*;
+use super::util::*;
 
 #[derive(Debug)]
 pub(crate) struct MpqHashTable {
@@ -61,17 +63,27 @@ impl MpqHashTable {
     }
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub(crate) struct HashTableEntry {
-    pub(crate) hash_a: u32,
-    pub(crate) hash_b: u32,
-    pub(crate) locale: u16,
-    pub(crate) platform: u16,
-    pub(crate) block_index: u32,
+    pub hash_a: u32,
+    pub hash_b: u32,
+    pub locale: u16,
+    pub platform: u16,
+    pub block_index: u32,
 }
 
 impl HashTableEntry {
-    fn from_reader<R: Read>(mut reader: R) -> Result<HashTableEntry, MpqError> {
+    pub fn new(hash_a: u32, hash_b: u32, block_index: u32) -> HashTableEntry {
+        HashTableEntry {
+            hash_a,
+            hash_b,
+            locale: 0,
+            platform: 0,
+            block_index,
+        }
+    }
+
+    pub fn from_reader<R: Read>(mut reader: R) -> Result<HashTableEntry, MpqError> {
         let hash_a = reader.read_u32::<LE>()?;
         let hash_b = reader.read_u32::<LE>()?;
         let locale = reader.read_u16::<LE>()?;
@@ -85,6 +97,30 @@ impl HashTableEntry {
             platform,
             block_index,
         })
+    }
+
+    pub fn blank() -> HashTableEntry {
+        HashTableEntry {
+            hash_a: 0xFFFF_FFFF,
+            hash_b: 0xFFFF_FFFF,
+            locale: 0xFFFF,
+            platform: 0x00FF,
+            block_index: 0xFFFF_FFFF,
+        }
+    }
+
+    pub fn is_blank(&self) -> bool {
+        self.block_index == 0xFFFF_FFFF
+    }
+
+    pub fn write<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+        writer.write_u32::<LE>(self.hash_a)?;
+        writer.write_u32::<LE>(self.hash_b)?;
+        writer.write_u16::<LE>(self.locale)?;
+        writer.write_u16::<LE>(self.platform)?;
+        writer.write_u32::<LE>(self.block_index)?;
+
+        Ok(())
     }
 }
 
@@ -119,14 +155,28 @@ impl MpqBlockTable {
 
 #[derive(Debug)]
 pub(crate) struct BlockTableEntry {
-    pub(crate) file_pos: u64,
-    pub(crate) compressed_size: u64,
-    pub(crate) uncompressed_size: u64,
-    pub(crate) flags: u32,
+    pub file_pos: u64,
+    pub compressed_size: u64,
+    pub uncompressed_size: u64,
+    pub flags: u32,
 }
 
 impl BlockTableEntry {
-    fn from_reader<R: Read>(mut reader: R) -> Result<BlockTableEntry, MpqError> {
+    pub fn new(
+        file_pos: u64,
+        compressed_size: u64,
+        uncompressed_size: u64,
+        flags: u32,
+    ) -> BlockTableEntry {
+        BlockTableEntry {
+            file_pos,
+            compressed_size,
+            uncompressed_size,
+            flags,
+        }
+    }
+
+    pub fn from_reader<R: Read>(mut reader: R) -> Result<BlockTableEntry, MpqError> {
         let file_pos = u64::from(reader.read_u32::<LE>()?);
         let compressed_size = u64::from(reader.read_u32::<LE>()?);
         let uncompressed_size = u64::from(reader.read_u32::<LE>()?);
@@ -140,19 +190,28 @@ impl BlockTableEntry {
         })
     }
 
-    pub(crate) fn is_imploded(&self) -> bool {
+    pub fn write<W: Write>(&self, mut writer: W) -> Result<(), IoError> {
+        writer.write_u32::<LE>(self.file_pos as u32)?;
+        writer.write_u32::<LE>(self.compressed_size as u32)?;
+        writer.write_u32::<LE>(self.uncompressed_size as u32)?;
+        writer.write_u32::<LE>(self.flags as u32)?;
+
+        Ok(())
+    }
+
+    pub fn is_imploded(&self) -> bool {
         (self.flags & MPQ_FILE_IMPLODE) != 0
     }
 
-    pub(crate) fn is_compressed(&self) -> bool {
+    pub fn is_compressed(&self) -> bool {
         (self.flags & MPQ_FILE_COMPRESS) != 0
     }
 
-    pub(crate) fn is_encrypted(&self) -> bool {
+    pub fn is_encrypted(&self) -> bool {
         (self.flags & MPQ_FILE_ENCRYPTED) != 0
     }
 
-    pub(crate) fn is_key_adjusted(&self) -> bool {
+    pub fn is_key_adjusted(&self) -> bool {
         (self.flags & MPQ_FILE_ADJUST_KEY) != 0
     }
 }
@@ -171,8 +230,11 @@ impl SectorOffsets {
     where
         R: Read + Seek,
     {
-        let sector_count = ((block_entry.uncompressed_size - 1) / seeker.info().sector_size) + 1;
+        let sector_count =
+            sector_count_from_size(block_entry.uncompressed_size, seeker.info().sector_size);
         let mut raw_data = seeker.read(block_entry.file_pos, (sector_count + 1) * 4)?;
+
+        hexdump::hexdump(&raw_data);
 
         if let Some(encryption_key) = encryption_key {
             decrypt_mpq_block(&mut raw_data, encryption_key);

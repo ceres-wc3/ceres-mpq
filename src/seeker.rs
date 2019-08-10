@@ -96,7 +96,7 @@ fn find_headers<R: Read + Seek>(mut reader: R) -> Result<ArchiveInfo, MpqError> 
 
     let mut header: Option<MpqFileHeader> = None;
     let mut file_header_offset: u64 = 0;
-    for i in 0..(file_size / HEADER_BOUNDARY) {
+    for i in 0..=(file_size / HEADER_BOUNDARY) {
         reader.seek(SeekFrom::Start(i * HEADER_BOUNDARY))?;
 
         let magic = reader.read_u32::<LE>()?;
@@ -115,14 +115,14 @@ fn find_headers<R: Read + Seek>(mut reader: R) -> Result<ArchiveInfo, MpqError> 
                     return Err(MpqError::Corrupted);
                 }
 
-                let file_header = MpqFileHeader::new(&mut reader)?;
+                let file_header = MpqFileHeader::from_reader(&mut reader)?;
                 header = Some(file_header);
                 break;
             } else {
                 return Err(MpqError::Corrupted);
             }
         } else if magic == HEADER_MPQ_MAGIC {
-            let file_header = MpqFileHeader::new(&mut reader)?;
+            let file_header = MpqFileHeader::from_reader(&mut reader)?;
 
             file_header_offset = i * HEADER_BOUNDARY;
             header = Some(file_header);

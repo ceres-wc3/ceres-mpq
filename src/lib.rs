@@ -5,7 +5,8 @@ pub(crate) mod crypto;
 pub(crate) mod header;
 pub(crate) mod seeker;
 pub(crate) mod tables;
-pub(crate) mod builder;
+pub(crate) mod util;
 
+pub mod builder;
 pub mod archive;
 pub mod error;
