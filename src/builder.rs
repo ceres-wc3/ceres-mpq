@@ -66,6 +66,16 @@ pub struct FileOptions {
     pub adjust_key: bool,
 }
 
+impl Default for FileOptions {
+    fn default() -> FileOptions {
+        FileOptions {
+            encrypt: false,
+            compress: false,
+            adjust_key: false,
+        }
+    }
+}
+
 impl FileOptions {
     fn flags(self) -> u32 {
         let mut flags = MPQ_FILE_EXISTS;
@@ -406,11 +416,23 @@ pub fn test_builder() {
 
     let options = FileOptions {
         compress: true,
-        encrypt: true,
+        encrypt: false,
         adjust_key: false,
     };
-    builder.add_file("hello.txt", "hello world!", options);
-    builder.add_file("this file is written in rust!.txt", "hello world!", options);
+
+    builder.add_file(
+        "uncompressed.txt",
+        "aaaaaaaaaaaaaaaaabzzzzzzzzzttttttttttttt",
+        FileOptions {
+            compress: false,
+            ..options
+        },
+    );
+    builder.add_file(
+        "compressed.txt",
+        "aaaaaaaaaaaaaaaaabzzzzzzzzzttttttttttttt",
+        options,
+    );
     builder.write(&mut out_file).unwrap();
 
     out_file.flush().unwrap();

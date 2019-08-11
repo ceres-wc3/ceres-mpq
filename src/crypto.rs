@@ -160,12 +160,12 @@ pub(crate) fn decode_mpq_block(
     input: &[u8],
     uncompressed_size: u64,
     encryption_key: Option<u32>,
-) -> Result<Vec<u8>, MpqError> {
+) -> Result<Cow<[u8]>, MpqError> {
     let compressed_size = input.len() as u64;
-    let mut buf: Vec<u8> = input.into();
+    let mut buf = Cow::Borrowed(input);
 
     if let Some(encryption_key) = encryption_key {
-        decrypt_mpq_block(&mut buf, encryption_key);
+        decrypt_mpq_block(buf.to_mut(), encryption_key);
     }
 
     if compressed_size < uncompressed_size {
@@ -205,7 +205,7 @@ pub(crate) fn decode_mpq_block(
             }
 
             decompressed.resize(decompressor.total_out() as usize, 0);
-            buf = decompressed;
+            buf = Cow::Owned(decompressed);
         }
 
         if compression_type & COMPRESSION_ZLIB != 0 {
@@ -222,7 +222,7 @@ pub(crate) fn decode_mpq_block(
             }
 
             decompressed.resize(decompressor.total_out() as usize, 0);
-            buf = decompressed;
+            buf = Cow::Owned(decompressed);
         }
     }
 

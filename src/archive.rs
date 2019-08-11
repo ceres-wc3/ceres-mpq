@@ -83,20 +83,19 @@ impl<R: Read + Seek> MpqReader<R> {
             };
 
             // decode the block and append it to the final result buffer
-            let encoded_sector = &raw_data[slice_start..slice_end];
-            let mut decoded_sector = decode_mpq_block(
-                encoded_sector,
+            let decoded_sector = decode_mpq_block(
+                &raw_data[slice_start..slice_end],
                 uncompressed_size,
                 encryption_key.map(|k| k + i as u32),
             )?;
 
-            result.append(&mut decoded_sector);
+            result.extend(decoded_sector.iter());
         }
 
         Ok(result)
     }
 
-    pub fn file_list(&mut self) -> Option<Vec<String>> {
+    pub fn files(&mut self) -> Option<Vec<String>> {
         let listfile = self.read_file("(listfile)").ok()?;
 
         let mut list = Vec::new();
@@ -143,11 +142,10 @@ pub fn test_archive() {
     // hexdump::hexdump(&archive.read_file("test1.txt").unwrap());
     // hexdump::hexdump(&archive.read_file("(listfile)").unwrap());
 
-    
-    let file_list = archive.file_list().unwrap();
+    let files = archive.files().unwrap();
 
     let mut total_size = 0;
-    for file_name in &file_list {
+    for file_name in &files {
         let file = archive.read_file(file_name);
 
         if file.is_err() {
@@ -162,5 +160,4 @@ pub fn test_archive() {
     }
 
     println!("total decompressed size: {}", total_size);
-    
 }
