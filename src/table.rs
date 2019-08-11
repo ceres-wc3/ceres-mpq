@@ -14,7 +14,7 @@ pub(crate) struct MpqHashTable {
 }
 
 impl MpqHashTable {
-    pub(crate) fn new<R>(seeker: &mut MpqSeeker<R>) -> Result<MpqHashTable, MpqError>
+    pub fn from_reader<R>(seeker: &mut MpqSeeker<R>) -> Result<MpqHashTable, MpqError>
     where
         R: Read + Seek,
     {
@@ -32,7 +32,7 @@ impl MpqHashTable {
         Ok(MpqHashTable { entries })
     }
 
-    pub(crate) fn find_entry(&self, name: &str) -> Option<&HashTableEntry> {
+    pub fn find_entry(&self, name: &str) -> Option<&HashTableEntry> {
         let hash_mask = self.entries.len() - 1;
         let part_a = hash_string_noslash(name.as_bytes(), MPQ_HASH_NAME_A);
         let part_b = hash_string_noslash(name.as_bytes(), MPQ_HASH_NAME_B);
@@ -129,7 +129,7 @@ pub(crate) struct MpqBlockTable {
 }
 
 impl MpqBlockTable {
-    pub(crate) fn new<R>(seeker: &mut MpqSeeker<R>) -> Result<MpqBlockTable, MpqError>
+    pub fn from_reader<R>(seeker: &mut MpqSeeker<R>) -> Result<MpqBlockTable, MpqError>
     where
         R: Read + Seek,
     {
@@ -147,7 +147,7 @@ impl MpqBlockTable {
         Ok(MpqBlockTable { entries })
     }
 
-    pub(crate) fn get(&self, index: usize) -> Option<&BlockTableEntry> {
+    pub fn get(&self, index: usize) -> Option<&BlockTableEntry> {
         self.entries.get(index)
     }
 }
@@ -221,7 +221,7 @@ pub(crate) struct SectorOffsets {
 }
 
 impl SectorOffsets {
-    pub(crate) fn new<R>(
+    pub fn from_reader<R>(
         seeker: &mut MpqSeeker<R>,
         block_entry: &BlockTableEntry,
         encryption_key: Option<u32>,
@@ -246,7 +246,7 @@ impl SectorOffsets {
         Ok(SectorOffsets { offsets })
     }
 
-    pub(crate) fn one(&self, index: usize) -> Option<(u32, u32)> {
+    pub fn one(&self, index: usize) -> Option<(u32, u32)> {
         if index >= (self.offsets.len() - 1) {
             None
         } else {
@@ -257,13 +257,13 @@ impl SectorOffsets {
         }
     }
 
-    pub(crate) fn all(&self) -> (u32, u32) {
+    pub fn all(&self) -> (u32, u32) {
         let len = self.offsets.len();
 
         (self.offsets[0], self.offsets[len - 1] - self.offsets[0])
     }
 
-    pub(crate) fn count(&self) -> usize {
+    pub fn count(&self) -> usize {
         self.offsets.len() - 1
     }
 }

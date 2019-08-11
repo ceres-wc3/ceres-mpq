@@ -17,8 +17,8 @@ impl<R: Read + Seek> MpqReader<R> {
     pub fn open(reader: R) -> Result<MpqReader<R>, MpqError> {
         let mut seeker = MpqSeeker::new(reader)?;
 
-        let hash_table = MpqHashTable::new(&mut seeker)?;
-        let block_table = MpqBlockTable::new(&mut seeker)?;
+        let hash_table = MpqHashTable::from_reader(&mut seeker)?;
+        let block_table = MpqBlockTable::from_reader(&mut seeker)?;
 
         Ok(MpqReader {
             seeker,
@@ -52,7 +52,7 @@ impl<R: Read + Seek> MpqReader<R> {
 
         // read the sector offsets
         let sector_offsets =
-            SectorOffsets::new(&mut self.seeker, block_entry, encryption_key.map(|k| k - 1))?;
+            SectorOffsets::from_reader(&mut self.seeker, block_entry, encryption_key.map(|k| k - 1))?;
 
         // read out all the sectors
         let sector_range = sector_offsets.all();
