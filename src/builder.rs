@@ -6,11 +6,10 @@ use std::io::{Seek, SeekFrom, Write};
 use byteorder::{WriteBytesExt, LE};
 use indexmap::IndexMap;
 
-use super::archive::MpqReader;
+// use super::archive::MpqReader;
 use super::consts::*;
-use super::crypto::*;
 use super::header::*;
-use super::tables::*;
+use super::table::*;
 use super::util::*;
 
 #[derive(Debug, PartialEq, Eq, Hash, Clone, Copy)]
@@ -410,29 +409,28 @@ where
 
 pub fn test_builder() {
     use std::fs::File;
+    use std::io::BufWriter;
 
     let mut builder = MpqBuilder::default();
-    let mut out_file = File::create("out.w3x").unwrap();
+    let out_file = File::create("out.w3x").unwrap();
+    let mut out_file = BufWriter::new(out_file);
 
     let options = FileOptions {
         compress: true,
-        encrypt: false,
-        adjust_key: false,
+        encrypt: true,
+        adjust_key: true,
     };
 
-    builder.add_file(
-        "uncompressed.txt",
-        "aaaaaaaaaaaaaaaaabzzzzzzzzzttttttttttttt",
-        FileOptions {
-            compress: false,
-            ..options
-        },
-    );
-    builder.add_file(
-        "compressed.txt",
-        "aaaaaaaaaaaaaaaaabzzzzzzzzzttttttttttttt",
-        options,
-    );
+    let huge = vec![0xffu8; 0x0010_0000];
+
+    for i in 0..1024 {
+        builder.add_file(
+            &format!("part{}", i),
+            huge.as_slice(),
+            options
+        );
+    }
+
     builder.write(&mut out_file).unwrap();
 
     out_file.flush().unwrap();

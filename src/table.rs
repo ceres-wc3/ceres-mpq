@@ -4,7 +4,6 @@ use std::io::{Read, Seek, Write};
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 
 use super::consts::*;
-use super::crypto::*;
 use super::error::MpqError;
 use super::seeker::*;
 use super::util::*;

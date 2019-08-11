@@ -1,10 +1,10 @@
 use std::fs;
 use std::io::{Read, Seek};
 
-use super::crypto::*;
+use super::util::*;
 use super::error::*;
 use super::seeker::*;
-use super::tables::*;
+use super::table::*;
 
 #[derive(Debug)]
 pub struct MpqReader<R: Read + Seek> {
