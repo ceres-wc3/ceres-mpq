@@ -3,6 +3,8 @@ pub(crate) const HEADER_MPQ_MAGIC: u32 = 0x1A51_504D;
 pub(crate) const HEADER_MPQ_SIZE: u64 = 32;
 pub(crate) const HEADER_USER_MAGIC: u32 = 0x1B51_504D;
 
+pub(crate) const MIN_HASH_TABLE_SIZE: usize = 32;
+
 pub(crate) const HASH_TABLE_KEY: u32 = 0xC3AF_3770;
 pub(crate) const HASH_TABLE_ENTRY_SIZE: u32 = 16;
 pub(crate) const HASH_TABLE_EMPTY_ENTRY: u32 = 0xFFFF_FFFF;
@@ -19,6 +21,7 @@ pub(crate) const MPQ_FILE_IMPLODE: u32 = 0x0000_0100;
 pub(crate) const MPQ_FILE_COMPRESS: u32 = 0x0000_0200;
 pub(crate) const MPQ_FILE_ENCRYPTED: u32 = 0x0001_0000;
 pub(crate) const MPQ_FILE_ADJUST_KEY: u32 = 0x0002_0000;
+pub(crate) const MPQ_FILE_EXISTS: u32 = 0x8000_0000;
 
 pub(crate) const COMPRESSION_IMA_ADCPM_MONO: u8 = 0x40;
 pub(crate) const COMPRESSION_IMA_ADCPM_STEREO: u8 = 0x80;

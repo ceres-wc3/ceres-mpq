@@ -3,5 +3,5 @@ use mpqer::builder;
 
 fn main() {
     builder::test_builder();
-    archive::test_archive();
+    // archive::test_archive();
 }

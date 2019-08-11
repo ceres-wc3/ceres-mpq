@@ -168,7 +168,7 @@ pub(crate) fn decode_mpq_block(
         decrypt_mpq_block(&mut buf, encryption_key);
     }
 
-    if compressed_size != uncompressed_size {
+    if compressed_size < uncompressed_size {
         let compression_type = buf[0];
 
         if compression_type & COMPRESSION_IMA_ADCPM_MONO != 0 {
@@ -229,6 +229,12 @@ pub(crate) fn decode_mpq_block(
     Ok(buf)
 }
 
+/// This will try to compress the block using zlib compression.
+/// If the compression succeeded, the block will be prepended by a single
+/// byte indicating which compression method was used.
+/// The compression can fail if the compressed buffer turns out to be
+/// larger than the uncompressed one, in which case it will simply
+/// return the uncompressed buffer.
 // TODO: Add support for multiple compression types
 pub(crate) fn compress_mpq_block(input: &[u8]) -> Cow<[u8]> {
     let mut compressed: Vec<u8> = vec![0u8; input.len() + 1];

@@ -146,7 +146,7 @@ pub fn test_archive() {
     /*
     let file_list = archive.file_list().unwrap();
 
-    let mut total_size = 0;
+    let mut total_size = 0;..
     for file_name in &file_list {
         let file = archive.read_file(file_name);
 
