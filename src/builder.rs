@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cmp::min;
 use std::io::Error as IoError;
 use std::io::{Seek, SeekFrom, Write};
@@ -37,7 +38,8 @@ impl FileKey {
 struct FileRecord {
     file_name: String,
     contents: Vec<u8>,
-    offset: Option<u64>,
+    offset: u64,
+    compressed_size: u64,
     options: FileOptions,
 }
 
@@ -50,7 +52,8 @@ impl FileRecord {
         FileRecord {
             file_name: name.into(),
             contents: contents.into(),
-            offset: None,
+            offset: 0,
+            compressed_size: 0,
             options,
         }
     }
@@ -61,6 +64,26 @@ pub struct FileOptions {
     pub encrypt: bool,
     pub compress: bool,
     pub adjust_key: bool,
+}
+
+impl FileOptions {
+    fn flags(self) -> u32 {
+        let mut flags = MPQ_FILE_EXISTS;
+
+        if self.encrypt {
+            flags |= MPQ_FILE_ENCRYPTED;
+        }
+
+        if self.adjust_key {
+            flags |= MPQ_FILE_ADJUST_KEY;
+        }
+
+        if self.compress {
+            flags |= MPQ_FILE_COMPRESS;
+        }
+
+        flags
+    }
 }
 
 #[derive(Debug)]
@@ -148,14 +171,9 @@ impl MpqBuilder {
             );
         }
 
-        // write out all the files back-to-back, and store their offsets and sizes
-        let mut file_offsets = Vec::with_capacity(added_files.len());
-        let mut file_sizes = Vec::with_capacity(added_files.len());
-        for file in added_files.values() {
-            let (offset, compressed_size) =
-                write_file(sector_size, archive_start, &mut writer, &file)?;
-            file_offsets.push(offset);
-            file_sizes.push(compressed_size);
+        // write out all the files back-to-back
+        for file in added_files.values_mut() {
+            write_file(sector_size, archive_start, &mut writer, file)?;
         }
 
         let mut hashtable_size = MIN_HASH_TABLE_SIZE;
@@ -164,126 +182,150 @@ impl MpqBuilder {
         }
 
         // write hash table and remember its position
-        let hashtable_pos = {
-            let hashtable_pos = writer.seek(SeekFrom::Current(0))?;
-            let mut hashtable = vec![HashTableEntry::blank(); hashtable_size];
-            let hash_index_mask = hashtable_size - 1;
-
-            for (block_index, (key, _)) in added_files.iter().enumerate() {
-                let hash_index = (key.index as usize) & hash_index_mask;
-                let hash_entry = HashTableEntry::new(key.hash_a, key.hash_b, block_index as u32);
-
-                hashtable[hash_index] = hash_entry;
-            }
-
-            let mut buf = vec![0u8; hashtable_size * HASH_TABLE_ENTRY_SIZE as usize];
-
-            let mut cursor = buf.as_mut_slice();
-            for entry in hashtable {
-                entry.write(&mut cursor)?;
-            }
-            encrypt_mpq_block(&mut buf, HASH_TABLE_KEY);
-
-            writer.write_all(&buf)?;
-
-            hashtable_pos
-        };
+        let hashtable_pos = write_hashtable(&mut writer, hashtable_size, &added_files)?;
 
         // write block table and remember its position
-        let blocktable_pos = {
-            let blocktable_pos = writer.seek(SeekFrom::Current(0))?;
+        let blocktable_pos = write_blocktable(&mut writer, &added_files)?;
 
-            let mut buf = vec![0u8; added_files.len() * BLOCK_TABLE_ENTRY_SIZE as usize];
-
-            let mut cursor = buf.as_mut_slice();
-            for (block_index, (_, file)) in added_files.iter().enumerate() {
-                let mut flags = MPQ_FILE_EXISTS;
-
-                if file.options.encrypt {
-                    flags |= MPQ_FILE_ENCRYPTED;
-                }
-
-                if file.options.adjust_key {
-                    flags |= MPQ_FILE_ADJUST_KEY;
-                }
-
-                if file.options.compress {
-                    flags |= MPQ_FILE_COMPRESS;
-                }
-
-                let block_entry = BlockTableEntry::new(
-                    file_offsets[block_index] - archive_start,
-                    file_sizes[block_index],
-                    file.contents.len() as u64,
-                    flags,
-                );
-
-                block_entry.write(&mut cursor)?;
-            }
-
-            encrypt_mpq_block(&mut buf, BLOCK_TABLE_KEY);
-            writer.write_all(&buf)?;
-
-            blocktable_pos
-        };
-
+        // write header
         let archive_end = writer.seek(SeekFrom::Current(0))?;
-
-        {
-            let header = MpqFileHeader::new_v1(
-                (archive_end - archive_start) as u32,
-                sector_size as u32,
-                (hashtable_pos - archive_start) as u32,
-                (blocktable_pos - archive_start) as u32,
-                hashtable_size as u32,
-                added_files.len() as u32,
-            );
-
-            writer.seek(SeekFrom::Start(archive_start))?;
-            header.write(&mut writer)?;
-        }
+        write_header(
+            &mut writer,
+            (archive_start, archive_end),
+            (hashtable_pos, hashtable_size),
+            (blocktable_pos, added_files.len()),
+            sector_size,
+        )?;
 
         Ok(())
     }
 }
 
+fn write_hashtable<W>(
+    mut writer: W,
+    hashtable_size: usize,
+    added_files: &IndexMap<FileKey, FileRecord>,
+) -> Result<u64, IoError>
+where
+    W: Write + Seek,
+{
+    let hashtable_pos = writer.seek(SeekFrom::Current(0))?;
+    let mut hashtable = vec![HashTableEntry::blank(); hashtable_size];
+    let hash_index_mask = hashtable_size - 1;
+
+    for (block_index, (key, _)) in added_files.iter().enumerate() {
+        let hash_index = (key.index as usize) & hash_index_mask;
+        let hash_entry = HashTableEntry::new(key.hash_a, key.hash_b, block_index as u32);
+
+        hashtable[hash_index] = hash_entry;
+    }
+
+    let mut buf = vec![0u8; hashtable_size * HASH_TABLE_ENTRY_SIZE as usize];
+
+    let mut cursor = buf.as_mut_slice();
+    for entry in hashtable {
+        entry.write(&mut cursor)?;
+    }
+    encrypt_mpq_block(&mut buf, HASH_TABLE_KEY);
+
+    writer.write_all(&buf)?;
+
+    Ok(hashtable_pos)
+}
+
+fn write_blocktable<W>(
+    mut writer: W,
+    added_files: &IndexMap<FileKey, FileRecord>,
+) -> Result<u64, IoError>
+where
+    W: Write + Seek,
+{
+    let blocktable_pos = writer.seek(SeekFrom::Current(0))?;
+
+    let mut buf = vec![0u8; added_files.len() * BLOCK_TABLE_ENTRY_SIZE as usize];
+
+    let mut cursor = buf.as_mut_slice();
+    for file in added_files.values() {
+        let flags = file.options.flags();
+
+        let block_entry = BlockTableEntry::new(
+            file.offset,
+            file.compressed_size,
+            file.contents.len() as u64,
+            flags,
+        );
+
+        block_entry.write(&mut cursor)?;
+    }
+
+    encrypt_mpq_block(&mut buf, BLOCK_TABLE_KEY);
+    writer.write_all(&buf)?;
+
+    Ok(blocktable_pos)
+}
+
+fn write_header<W>(
+    mut writer: W,
+    (archive_start, archive_end): (u64, u64),
+    (hashtable_pos, hashtable_size): (u64, usize),
+    (blocktable_pos, blocktable_size): (u64, usize),
+    sector_size: u64,
+) -> Result<(), IoError>
+where
+    W: Write + Seek,
+{
+    let header = MpqFileHeader::new_v1(
+        (archive_end - archive_start) as u32,
+        sector_size as u32,
+        (hashtable_pos - archive_start) as u32,
+        (blocktable_pos - archive_start) as u32,
+        hashtable_size as u32,
+        blocktable_size as u32,
+    );
+
+    writer.seek(SeekFrom::Start(archive_start))?;
+    header.write(&mut writer)?;
+
+    Ok(())
+}
+
 /// Writes out the specified file starting at the writer's current position.
 /// If the file is marked for compression, a Sector Offset Table (SOT) will be written, and all sectors will attempt compression.
-/// If the file is not marked for compression, no SOT will be written, and sectoring will not be done.
+/// If the file is not marked for compression, no SOT will be written.
 /// If the file is marked for encryption, it will also be encrypted after compression.
 fn write_file<W>(
     sector_size: u64,
     archive_start: u64,
     mut writer: W,
-    file: &FileRecord,
-) -> Result<(u64, u64), IoError>
+    file: &mut FileRecord,
+) -> Result<(), IoError>
 where
     W: Write + Seek,
 {
     let options = file.options;
+    let sector_count = sector_count_from_size(file.contents.len() as u64, sector_size);
+    let file_start = writer.seek(SeekFrom::Current(0))?;
+
+    // calculate the encryption key if encryption was requested
+    let encryption_key = if options.encrypt {
+        Some(calculate_file_key(
+            &file.file_name,
+            (file_start - archive_start) as u32,
+            file.contents.len() as u32,
+            options.adjust_key,
+        ))
+    } else {
+        None
+    };
 
     if options.compress {
-        let sector_count = sector_count_from_size(file.contents.len() as u64, sector_size);
-        let sector_table_pos = writer.seek(SeekFrom::Current(0))?;
-
-        let encryption_key = if options.encrypt {
-            Some(calculate_file_key(
-                &file.file_name,
-                (sector_table_pos - archive_start) as u32,
-                file.contents.len() as u32,
-                options.adjust_key,
-            ))
-        } else {
-            None
-        };
-
         let mut offsets: Vec<u32> = Vec::new();
 
-        // store the start of the first sector
+        // store the start of the first sector and prepare to write there
         let first_sector_start = ((sector_count + 1) * 4) as u32;
         writer.seek(SeekFrom::Current(i64::from(first_sector_start)))?;
         offsets.push(first_sector_start);
-        // write each sector and its end
+        // write each sector and the offset of its end
         for i in 0..sector_count {
             let sector_start = i * sector_size;
             let sector_end = min((i + 1) * sector_size, file.contents.len() as u64);
@@ -302,7 +344,7 @@ where
             // which is also the start of the next sector if there is one
 
             let current_offset = writer.seek(SeekFrom::Current(0))?;
-            offsets.push((current_offset - sector_table_pos) as u32);
+            offsets.push((current_offset - file_start) as u32);
         }
 
         let file_end = writer.seek(SeekFrom::Current(0))?;
@@ -320,16 +362,39 @@ where
                 encrypt_mpq_block(&mut buf, key);
             }
 
-            writer.seek(SeekFrom::Start(sector_table_pos))?;
+            writer.seek(SeekFrom::Start(file_start))?;
             writer.write_all(&buf)?;
         }
 
         // put the writer at the file end, so that we don't overwrite this file with subsequent writes
         writer.seek(SeekFrom::Start(file_end))?;
 
-        Ok((sector_table_pos, u64::from(*offsets.last().unwrap())))
+        file.offset = file_start - archive_start;
+        file.compressed_size = file_end - file_start;
+
+        Ok(())
     } else {
-        unimplemented!("uncompressed files not yet supported")
+        // write each sector
+        for i in 0..sector_count {
+            let sector_start = i * sector_size;
+            let sector_end = min((i + 1) * sector_size, file.contents.len() as u64);
+            let data = &file.contents[sector_start as usize..sector_end as usize];
+            let mut buf = Cow::Borrowed(data);
+
+            // encrypt the block if encryption was requested
+            if let Some(key) = encryption_key.map(|k| k + i as u32) {
+                encrypt_mpq_block(buf.to_mut(), key);
+            }
+
+            writer.write_all(&buf)?;
+        }
+
+        let file_end = writer.seek(SeekFrom::Current(0))?;
+
+        file.offset = file_start - archive_start;
+        file.compressed_size = file_end - file_start;
+
+        Ok(())
     }
 }
 

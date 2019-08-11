@@ -126,7 +126,16 @@ pub fn test_archive() {
     // let file = fs::File::open("yarpb1.w3x").unwrap();
     // let reader = BufReader::new(file);
     // println!("READING REFERENCE >>>>>");
-    // let buf = fs::read("out_ref.w3x").unwrap();
+    let buf = fs::read("guhun-beta8.w3x").unwrap();
+    let reader = std::io::Cursor::new(buf);
+
+    let mut archive = MpqReader::open(reader).unwrap();
+
+    // hexdump::hexdump(&archive.read_file("test1.txt").unwrap());
+    // hexdump::hexdump(&archive.read_file("(listfile)").unwrap());
+
+    // println!("READING TEST >>>>>");
+    // let buf = fs::read("out.w3x").unwrap();
     // let reader = std::io::Cursor::new(buf);
 
     // let mut archive = MpqReader::open(reader).unwrap();
@@ -134,19 +143,10 @@ pub fn test_archive() {
     // hexdump::hexdump(&archive.read_file("test1.txt").unwrap());
     // hexdump::hexdump(&archive.read_file("(listfile)").unwrap());
 
-    println!("READING TEST >>>>>");
-    let buf = fs::read("out.w3x").unwrap();
-    let reader = std::io::Cursor::new(buf);
-
-    let mut archive = MpqReader::open(reader).unwrap();
-
-    hexdump::hexdump(&archive.read_file("test1.txt").unwrap());
-    hexdump::hexdump(&archive.read_file("(listfile)").unwrap());
-
-    /*
+    
     let file_list = archive.file_list().unwrap();
 
-    let mut total_size = 0;..
+    let mut total_size = 0;
     for file_name in &file_list {
         let file = archive.read_file(file_name);
 
@@ -162,5 +162,5 @@ pub fn test_archive() {
     }
 
     println!("total decompressed size: {}", total_size);
-    */
+    
 }

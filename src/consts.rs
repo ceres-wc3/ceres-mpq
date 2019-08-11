@@ -23,8 +23,8 @@ pub(crate) const MPQ_FILE_ENCRYPTED: u32 = 0x0001_0000;
 pub(crate) const MPQ_FILE_ADJUST_KEY: u32 = 0x0002_0000;
 pub(crate) const MPQ_FILE_EXISTS: u32 = 0x8000_0000;
 
-pub(crate) const COMPRESSION_IMA_ADCPM_MONO: u8 = 0x40;
-pub(crate) const COMPRESSION_IMA_ADCPM_STEREO: u8 = 0x80;
+pub(crate) const COMPRESSION_IMA_ADPCM_MONO_MONO: u8 = 0x40;
+pub(crate) const COMPRESSION_IMA_ADPCM_MONO_STEREO: u8 = 0x80;
 pub(crate) const COMPRESSION_HUFFMAN: u8 = 0x01;
 pub(crate) const COMPRESSION_ZLIB: u8 = 0x02;
 pub(crate) const COMPRESSION_PKWARE: u8 = 0x08;

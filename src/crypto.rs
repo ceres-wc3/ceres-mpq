@@ -151,7 +151,7 @@ pub(crate) fn calculate_file_key(
 /// This will try to perform the following two operations:
 /// 1) If `encryption_key` is specified, it will decrypt the block using
 /// that encryption key.
-/// 2) If `input.len()` != `uncompressed_size`, it will try to decompress
+/// 2) If `input.len()` < `uncompressed_size`, it will try to decompress
 /// the block. MPQ supports multiple compression types, and the compression
 /// type used for a particular block is specified in the first byte of the block
 /// as a set of bitflags.
@@ -171,13 +171,13 @@ pub(crate) fn decode_mpq_block(
     if compressed_size < uncompressed_size {
         let compression_type = buf[0];
 
-        if compression_type & COMPRESSION_IMA_ADCPM_MONO != 0 {
+        if compression_type & COMPRESSION_IMA_ADPCM_MONO_MONO != 0 {
             return Err(MpqError::UnsupportedCompression {
                 kind: "IMA ADCPM Mono".to_string(),
             });
         }
 
-        if compression_type & COMPRESSION_IMA_ADCPM_STEREO != 0 {
+        if compression_type & COMPRESSION_IMA_ADPCM_MONO_STEREO != 0 {
             return Err(MpqError::UnsupportedCompression {
                 kind: "IMA ADCPM Stereo".to_string(),
             });
