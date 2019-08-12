@@ -3,20 +3,20 @@ use std::io::{Read, Seek, SeekFrom};
 use byteorder::{ReadBytesExt, LE};
 
 use super::consts::*;
-use super::error::MpqError;
+use super::error::Error;
 use super::header::*;
 
 #[derive(Debug)]
-pub(crate) struct MpqSeeker<R: Read + Seek> {
+pub(crate) struct Seeker<R: Read + Seek> {
     reader: R,
     archive_info: ArchiveInfo,
 }
 
-impl<R: Read + Seek> MpqSeeker<R> {
-    pub(crate) fn new(mut reader: R) -> Result<MpqSeeker<R>, MpqError> {
+impl<R: Read + Seek> Seeker<R> {
+    pub(crate) fn new(mut reader: R) -> Result<Seeker<R>, Error> {
         let archive_info = find_headers(&mut reader)?;
 
-        Ok(MpqSeeker {
+        Ok(Seeker {
             reader,
             archive_info,
         })
@@ -30,11 +30,11 @@ impl<R: Read + Seek> MpqSeeker<R> {
         &self.archive_info
     }
 
-    pub(crate) fn read(&mut self, offset: u64, size: u64) -> Result<Vec<u8>, MpqError> {
+    pub(crate) fn read(&mut self, offset: u64, size: u64) -> Result<Vec<u8>, Error> {
         let offset = self.archive_offset(offset);
 
         if offset + size > self.archive_info.file_size {
-            return Err(MpqError::Corrupted);
+            return Err(Error::Corrupted);
         }
 
         self.reader.seek(SeekFrom::Start(offset))?;
@@ -64,7 +64,7 @@ pub(crate) struct ArchiveInfo {
 }
 
 impl ArchiveInfo {
-    fn new(file_size: u64, header_offset: u64, header: &MpqFileHeader) -> ArchiveInfo {
+    fn new(file_size: u64, header_offset: u64, header: &FileHeader) -> ArchiveInfo {
         let hash_table_info = TableInfo {
             entries: u64::from(header.hash_table_entries),
             offset: u64::from(header.hash_table_offset),
@@ -91,10 +91,10 @@ impl ArchiveInfo {
     }
 }
 
-fn find_headers<R: Read + Seek>(mut reader: R) -> Result<ArchiveInfo, MpqError> {
+fn find_headers<R: Read + Seek>(mut reader: R) -> Result<ArchiveInfo, Error> {
     let file_size = reader.seek(SeekFrom::End(0))?;
 
-    let mut header: Option<MpqFileHeader> = None;
+    let mut header: Option<FileHeader> = None;
     let mut file_header_offset: u64 = 0;
     for i in 0..=(file_size / HEADER_BOUNDARY) {
         reader.seek(SeekFrom::Start(i * HEADER_BOUNDARY))?;
@@ -102,7 +102,7 @@ fn find_headers<R: Read + Seek>(mut reader: R) -> Result<ArchiveInfo, MpqError> 
         let magic = reader.read_u32::<LE>()?;
 
         if magic == HEADER_USER_MAGIC {
-            let user_header = MpqUserHeader::new(&mut reader)?;
+            let user_header = UserHeader::new(&mut reader)?;
             let user_header_offset = i * HEADER_BOUNDARY;
             file_header_offset = u64::from(user_header.file_header_offset) + user_header_offset;
 
@@ -112,17 +112,17 @@ fn find_headers<R: Read + Seek>(mut reader: R) -> Result<ArchiveInfo, MpqError> 
                 let magic = reader.read_u32::<LE>()?;
 
                 if magic != HEADER_MPQ_MAGIC {
-                    return Err(MpqError::Corrupted);
+                    return Err(Error::Corrupted);
                 }
 
-                let file_header = MpqFileHeader::from_reader(&mut reader)?;
+                let file_header = FileHeader::from_reader(&mut reader)?;
                 header = Some(file_header);
                 break;
             } else {
-                return Err(MpqError::Corrupted);
+                return Err(Error::Corrupted);
             }
         } else if magic == HEADER_MPQ_MAGIC {
-            let file_header = MpqFileHeader::from_reader(&mut reader)?;
+            let file_header = FileHeader::from_reader(&mut reader)?;
 
             file_header_offset = i * HEADER_BOUNDARY;
             header = Some(file_header);
@@ -133,6 +133,6 @@ fn find_headers<R: Read + Seek>(mut reader: R) -> Result<ArchiveInfo, MpqError> 
     if let Some(header) = header {
         Ok(ArchiveInfo::new(file_size, file_header_offset, &header))
     } else {
-        Err(MpqError::NoHeader)
+        Err(Error::NoHeader)
     }
 }

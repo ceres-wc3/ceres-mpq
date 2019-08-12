@@ -3,7 +3,7 @@ use std::io::Error as IoError;
 use err_derive::Error;
 
 #[derive(Debug, Error)]
-pub enum MpqError {
+pub enum Error {
     #[error(display = "No header found")]
     NoHeader,
     #[error(display = "IO Error: {}", cause)]
@@ -18,8 +18,8 @@ pub enum MpqError {
     UnsupportedCompression { kind: String },
 }
 
-impl From<IoError> for MpqError {
+impl From<IoError> for Error {
     fn from(other: IoError) -> Self {
-        MpqError::IoError { cause: other }
+        Error::IoError { cause: other }
     }
 }

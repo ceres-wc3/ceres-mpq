@@ -1,7 +1,7 @@
-use mpqer::archive;
-use mpqer::builder;
+use ceres_mpq::archive;
+use ceres_mpq::creator;
 
 fn main() {
-    builder::test_builder();
+    creator::test_builder();
     // archive::test_archive();
 }

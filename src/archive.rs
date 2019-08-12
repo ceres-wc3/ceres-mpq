@@ -1,42 +1,66 @@
 use std::fs;
 use std::io::{Read, Seek};
 
-use super::util::*;
 use super::error::*;
 use super::seeker::*;
 use super::table::*;
+use super::util::*;
 
 #[derive(Debug)]
-pub struct MpqReader<R: Read + Seek> {
-    seeker: MpqSeeker<R>,
-    hash_table: MpqHashTable,
-    block_table: MpqBlockTable,
+/// Implementation of a MoPaQ archive viewer.
+/// 
+/// Refer to top-level documentation to see which features are supported.
+/// 
+/// Will work on any reader that implements `Read + Seek`.
+pub struct Archive<R: Read + Seek> {
+    seeker: Seeker<R>,
+    hash_table: FileHashTable,
+    block_table: FileBlockTable,
 }
 
-impl<R: Read + Seek> MpqReader<R> {
-    pub fn open(reader: R) -> Result<MpqReader<R>, MpqError> {
-        let mut seeker = MpqSeeker::new(reader)?;
+impl<R: Read + Seek> Archive<R> {
+    /// Try to open an MPQ archive from the specified `reader`.
+    /// 
+    /// Immediately, this will perform the following:
+    /// 
+    /// 1. Locate an MPQ header.
+    /// 2. Locate and read the Hash Table.
+    /// 3. Locate and read the Block Table.
+    /// 
+    /// If any of these steps fail, the archive is deemed corrupted and
+    /// an appropriate error is returned.
+    /// 
+    /// No other operations will be performed.
+    pub fn open(reader: R) -> Result<Archive<R>, Error> {
+        let mut seeker = Seeker::new(reader)?;
 
-        let hash_table = MpqHashTable::from_reader(&mut seeker)?;
-        let block_table = MpqBlockTable::from_reader(&mut seeker)?;
+        let hash_table = FileHashTable::from_seeker(&mut seeker)?;
+        let block_table = FileBlockTable::from_seeker(&mut seeker)?;
 
-        Ok(MpqReader {
+        Ok(Archive {
             seeker,
             hash_table,
             block_table,
         })
     }
 
-    pub fn read_file(&mut self, name: &str) -> Result<Vec<u8>, MpqError> {
+    /// Read a file's contents. 
+    /// 
+    /// Notably, the filename resolution algorithm
+    /// is case-insensitive, and will treat backslashes (`\`) and forward slashes (`/`)
+    /// as the same character.
+    /// 
+    /// Does not support single-unit files or uncompressed files.
+    pub fn read_file(&mut self, name: &str) -> Result<Vec<u8>, Error> {
         // find the hash entry and use it to find the block entry
         let hash_entry = self
             .hash_table
             .find_entry(name)
-            .ok_or(MpqError::FileNotFound)?;
+            .ok_or(Error::FileNotFound)?;
         let block_entry = self
             .block_table
             .get(hash_entry.block_index as usize)
-            .ok_or(MpqError::FileNotFound)?;
+            .ok_or(Error::FileNotFound)?;
 
         // calculate the file key
         let encryption_key = if block_entry.is_encrypted() {
@@ -51,8 +75,11 @@ impl<R: Read + Seek> MpqReader<R> {
         };
 
         // read the sector offsets
-        let sector_offsets =
-            SectorOffsets::from_reader(&mut self.seeker, block_entry, encryption_key.map(|k| k - 1))?;
+        let sector_offsets = SectorOffsets::from_reader(
+            &mut self.seeker,
+            block_entry,
+            encryption_key.map(|k| k - 1),
+        )?;
 
         // read out all the sectors
         let sector_range = sector_offsets.all();
@@ -95,6 +122,8 @@ impl<R: Read + Seek> MpqReader<R> {
         Ok(result)
     }
 
+    /// If the archive contains a `(listfile)`, this will method
+    /// parse it and return a `Vec` containing all known filenames.
     pub fn files(&mut self) -> Option<Vec<String>> {
         let listfile = self.read_file("(listfile)").ok()?;
 
@@ -128,7 +157,7 @@ pub fn test_archive() {
     let buf = fs::read("guhun-beta8.w3x").unwrap();
     let reader = std::io::Cursor::new(buf);
 
-    let mut archive = MpqReader::open(reader).unwrap();
+    let mut archive = Archive::open(reader).unwrap();
 
     // hexdump::hexdump(&archive.read_file("test1.txt").unwrap());
     // hexdump::hexdump(&archive.read_file("(listfile)").unwrap());
@@ -137,7 +166,7 @@ pub fn test_archive() {
     // let buf = fs::read("out.w3x").unwrap();
     // let reader = std::io::Cursor::new(buf);
 
-    // let mut archive = MpqReader::open(reader).unwrap();
+    // let mut archive = Archive::open(reader).unwrap();
 
     // hexdump::hexdump(&archive.read_file("test1.txt").unwrap());
     // hexdump::hexdump(&archive.read_file("(listfile)").unwrap());

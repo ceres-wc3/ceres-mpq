@@ -6,7 +6,7 @@ use std::io::{Seek, SeekFrom, Write};
 use byteorder::{WriteBytesExt, LE};
 use indexmap::IndexMap;
 
-// use super::archive::MpqReader;
+// use super::archive::Archive;
 use super::consts::*;
 use super::header::*;
 use super::table::*;
@@ -21,9 +21,9 @@ struct FileKey {
 
 impl FileKey {
     fn new(name: &str) -> FileKey {
-        let hash_a = hash_string_noslash(name.as_bytes(), MPQ_HASH_NAME_A);
-        let hash_b = hash_string_noslash(name.as_bytes(), MPQ_HASH_NAME_B);
-        let index = hash_string_noslash(name.as_bytes(), MPQ_HASH_TABLE_INDEX);
+        let hash_a = hash_string(name.as_bytes(), MPQ_HASH_NAME_A);
+        let hash_b = hash_string(name.as_bytes(), MPQ_HASH_NAME_B);
+        let index = hash_string(name.as_bytes(), MPQ_HASH_TABLE_INDEX);
 
         FileKey {
             hash_a,
@@ -59,9 +59,18 @@ impl FileRecord {
 }
 
 #[derive(Debug, Clone, Copy)]
+/// Represents various options that can be used when adding a file to an archive.
 pub struct FileOptions {
+    /// Whether to encrypt the file using MPQ's encryption scheme. 
+    /// The encryption key is derived from the file name, so in practice
+    /// this is pretty useless.
     pub encrypt: bool,
+    /// Whether to compress the file. Currently will only try to use DEFLATE
+    /// compression.
     pub compress: bool,
+    /// If the file is ecnrypted, this will "adjust" the encryption key by
+    /// performing some simple transformations on it. By default, this is used for
+    /// "technical" files such as `(listfile)`.
     pub adjust_key: bool,
 }
 
@@ -96,24 +105,36 @@ impl FileOptions {
 }
 
 #[derive(Debug)]
-// TODO: Add documentation
+/// Creator capable of creating MPQ Version 1 archives.
+/// 
+/// Will hold all the files in memory until asked to [write](struct.Creator.html#method.write) them
+/// to a `writer`.
+/// 
+/// When writing, a `(listfile)` will be automatically appended to the archive.
 // TODO: Add support for multiple compression types
-pub struct MpqBuilder {
+pub struct Creator {
     added_files: IndexMap<FileKey, FileRecord>,
 
     sector_size: u64,
 }
 
-impl Default for MpqBuilder {
-    fn default() -> MpqBuilder {
-        MpqBuilder {
+impl Default for Creator {
+    fn default() -> Creator {
+        Creator {
             added_files: IndexMap::new(),
             sector_size: 0x10000,
         }
     }
 }
 
-impl MpqBuilder {
+impl Creator {
+    /// Adds a file to be later written to the archive.
+    ///
+    /// Notably, the filename resolution algorithm
+    /// is case-insensitive, and will treat backslashes (`\`) and forward slashes (`/`)
+    /// as the same character.
+    ///
+    /// [`FileOptions`](struct.FileOptions.html) determine how exactly to add the file.
     pub fn add_file<C>(&mut self, file_name: &str, contents: C, options: FileOptions)
     where
         C: Into<Vec<u8>>,
@@ -127,9 +148,9 @@ impl MpqBuilder {
 
     /// Writes out the entire archive to the specified writer.
     ///
-    /// The archive start position is calculated as follows:
-    /// `((current_pos + (HEADER_BOUNDARY - 1)) / HEADER_BOUNDARY) * HEADER_BOUNDARY`
-    /// Where `current_pos` is the writer's current seek pos, and `HEADER_BOUNDARY` is 512.
+    /// The archive start position is calculated as follows:  
+    /// `((current_pos + (HEADER_BOUNDARY - 1)) / HEADER_BOUNDARY) * HEADER_BOUNDARY`  
+    /// Where `current_pos` is the `writer`'s current seek pos, and `HEADER_BOUNDARY` is 512.
     ///
     /// Will write the following:
     /// - MPQ Header
@@ -141,7 +162,7 @@ impl MpqBuilder {
         W: Write + Seek,
     {
         let (mut added_files, sector_size) = match self {
-            MpqBuilder {
+            Creator {
                 added_files,
                 sector_size,
             } => (added_files, sector_size),
@@ -219,12 +240,12 @@ where
     W: Write + Seek,
 {
     let hashtable_pos = writer.seek(SeekFrom::Current(0))?;
-    let mut hashtable = vec![HashTableEntry::blank(); hashtable_size];
+    let mut hashtable = vec![HashEntry::blank(); hashtable_size];
     let hash_index_mask = hashtable_size - 1;
 
     for (block_index, (key, _)) in added_files.iter().enumerate() {
         let hash_index = (key.index as usize) & hash_index_mask;
-        let hash_entry = HashTableEntry::new(key.hash_a, key.hash_b, block_index as u32);
+        let hash_entry = HashEntry::new(key.hash_a, key.hash_b, block_index as u32);
 
         hashtable[hash_index] = hash_entry;
     }
@@ -257,7 +278,7 @@ where
     for file in added_files.values() {
         let flags = file.options.flags();
 
-        let block_entry = BlockTableEntry::new(
+        let block_entry = BlockEntry::new(
             file.offset,
             file.compressed_size,
             file.contents.len() as u64,
@@ -283,7 +304,7 @@ fn write_header<W>(
 where
     W: Write + Seek,
 {
-    let header = MpqFileHeader::new_v1(
+    let header = FileHeader::new_v1(
         (archive_end - archive_start) as u32,
         sector_size as u32,
         (hashtable_pos - archive_start) as u32,
@@ -408,30 +429,29 @@ where
 }
 
 pub fn test_builder() {
-    use std::fs::File;
-    use std::io::BufWriter;
+    println!("normal: {}, {}", hash_string(b"ABCD/AB", 0), hash_string(b"ABCD\\AB", 0));
+    println!("noslash: {}, {}", hash_string_noslash(b"ABCD/AB", 0), hash_string_noslash(b"ABCD\\AB", 0));
 
-    let mut builder = MpqBuilder::default();
-    let out_file = File::create("out.w3x").unwrap();
-    let mut out_file = BufWriter::new(out_file);
+    // use std::fs::File;
+    // use std::io::BufWriter;
 
-    let options = FileOptions {
-        compress: true,
-        encrypt: true,
-        adjust_key: true,
-    };
+    // let mut builder = Creator::default();
+    // let out_file = File::create("out.w3x").unwrap();
+    // let mut out_file = BufWriter::new(out_file);
 
-    let huge = vec![0xffu8; 0x0010_0000];
+    // let options = FileOptions {
+    //     compress: true,
+    //     encrypt: true,
+    //     adjust_key: true,
+    // };
 
-    for i in 0..1024 {
-        builder.add_file(
-            &format!("part{}", i),
-            huge.as_slice(),
-            options
-        );
-    }
+    // let huge = vec![0xffu8; 0x0010_0000];
 
-    builder.write(&mut out_file).unwrap();
+    // for i in 0..1024 {
+    //     builder.add_file(&format!("part{}", i), huge.as_slice(), options);
+    // }
 
-    out_file.flush().unwrap();
+    // builder.write(&mut out_file).unwrap();
+
+    // out_file.flush().unwrap();
 }

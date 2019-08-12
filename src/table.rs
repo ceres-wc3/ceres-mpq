@@ -4,17 +4,17 @@ use std::io::{Read, Seek, Write};
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 
 use super::consts::*;
-use super::error::MpqError;
+use super::error::Error;
 use super::seeker::*;
 use super::util::*;
 
 #[derive(Debug)]
-pub(crate) struct MpqHashTable {
-    entries: Vec<HashTableEntry>,
+pub(crate) struct FileHashTable {
+    entries: Vec<HashEntry>,
 }
 
-impl MpqHashTable {
-    pub fn from_reader<R>(seeker: &mut MpqSeeker<R>) -> Result<MpqHashTable, MpqError>
+impl FileHashTable {
+    pub fn from_seeker<R>(seeker: &mut Seeker<R>) -> Result<FileHashTable, Error>
     where
         R: Read + Seek,
     {
@@ -26,17 +26,17 @@ impl MpqHashTable {
         let mut entries = Vec::with_capacity(info.entries as usize);
         let mut slice = &decoded_data[..];
         for _ in 0..info.entries {
-            entries.push(HashTableEntry::from_reader(&mut slice)?);
+            entries.push(HashEntry::from_reader(&mut slice)?);
         }
 
-        Ok(MpqHashTable { entries })
+        Ok(FileHashTable { entries })
     }
 
-    pub fn find_entry(&self, name: &str) -> Option<&HashTableEntry> {
+    pub fn find_entry(&self, name: &str) -> Option<&HashEntry> {
         let hash_mask = self.entries.len() - 1;
-        let part_a = hash_string_noslash(name.as_bytes(), MPQ_HASH_NAME_A);
-        let part_b = hash_string_noslash(name.as_bytes(), MPQ_HASH_NAME_B);
-        let index = hash_string_noslash(name.as_bytes(), MPQ_HASH_TABLE_INDEX) as usize;
+        let part_a = hash_string(name.as_bytes(), MPQ_HASH_NAME_A);
+        let part_b = hash_string(name.as_bytes(), MPQ_HASH_NAME_B);
+        let index = hash_string(name.as_bytes(), MPQ_HASH_TABLE_INDEX) as usize;
 
         let start_index = index & hash_mask;
         let mut index = start_index;
@@ -63,7 +63,7 @@ impl MpqHashTable {
 }
 
 #[derive(Debug, Clone, Copy)]
-pub(crate) struct HashTableEntry {
+pub(crate) struct HashEntry {
     pub hash_a: u32,
     pub hash_b: u32,
     pub locale: u16,
@@ -71,9 +71,9 @@ pub(crate) struct HashTableEntry {
     pub block_index: u32,
 }
 
-impl HashTableEntry {
-    pub fn new(hash_a: u32, hash_b: u32, block_index: u32) -> HashTableEntry {
-        HashTableEntry {
+impl HashEntry {
+    pub fn new(hash_a: u32, hash_b: u32, block_index: u32) -> HashEntry {
+        HashEntry {
             hash_a,
             hash_b,
             locale: 0,
@@ -82,14 +82,14 @@ impl HashTableEntry {
         }
     }
 
-    pub fn from_reader<R: Read>(mut reader: R) -> Result<HashTableEntry, MpqError> {
+    pub fn from_reader<R: Read>(mut reader: R) -> Result<HashEntry, Error> {
         let hash_a = reader.read_u32::<LE>()?;
         let hash_b = reader.read_u32::<LE>()?;
         let locale = reader.read_u16::<LE>()?;
         let platform = reader.read_u16::<LE>()?;
         let block_index = reader.read_u32::<LE>()?;
 
-        Ok(HashTableEntry {
+        Ok(HashEntry {
             hash_a,
             hash_b,
             locale,
@@ -98,8 +98,8 @@ impl HashTableEntry {
         })
     }
 
-    pub fn blank() -> HashTableEntry {
-        HashTableEntry {
+    pub fn blank() -> HashEntry {
+        HashEntry {
             hash_a: 0xFFFF_FFFF,
             hash_b: 0xFFFF_FFFF,
             locale: 0xFFFF,
@@ -124,12 +124,12 @@ impl HashTableEntry {
 }
 
 #[derive(Debug)]
-pub(crate) struct MpqBlockTable {
-    entries: Vec<BlockTableEntry>,
+pub(crate) struct FileBlockTable {
+    entries: Vec<BlockEntry>,
 }
 
-impl MpqBlockTable {
-    pub fn from_reader<R>(seeker: &mut MpqSeeker<R>) -> Result<MpqBlockTable, MpqError>
+impl FileBlockTable {
+    pub fn from_seeker<R>(seeker: &mut Seeker<R>) -> Result<FileBlockTable, Error>
     where
         R: Read + Seek,
     {
@@ -141,33 +141,33 @@ impl MpqBlockTable {
         let mut entries = Vec::with_capacity(info.entries as usize);
         let mut slice = &decoded_data[..];
         for _ in 0..info.entries {
-            entries.push(BlockTableEntry::from_reader(&mut slice)?);
+            entries.push(BlockEntry::from_reader(&mut slice)?);
         }
 
-        Ok(MpqBlockTable { entries })
+        Ok(FileBlockTable { entries })
     }
 
-    pub fn get(&self, index: usize) -> Option<&BlockTableEntry> {
+    pub fn get(&self, index: usize) -> Option<&BlockEntry> {
         self.entries.get(index)
     }
 }
 
 #[derive(Debug)]
-pub(crate) struct BlockTableEntry {
+pub(crate) struct BlockEntry {
     pub file_pos: u64,
     pub compressed_size: u64,
     pub uncompressed_size: u64,
     pub flags: u32,
 }
 
-impl BlockTableEntry {
+impl BlockEntry {
     pub fn new(
         file_pos: u64,
         compressed_size: u64,
         uncompressed_size: u64,
         flags: u32,
-    ) -> BlockTableEntry {
-        BlockTableEntry {
+    ) -> BlockEntry {
+        BlockEntry {
             file_pos,
             compressed_size,
             uncompressed_size,
@@ -175,13 +175,13 @@ impl BlockTableEntry {
         }
     }
 
-    pub fn from_reader<R: Read>(mut reader: R) -> Result<BlockTableEntry, MpqError> {
+    pub fn from_reader<R: Read>(mut reader: R) -> Result<BlockEntry, Error> {
         let file_pos = u64::from(reader.read_u32::<LE>()?);
         let compressed_size = u64::from(reader.read_u32::<LE>()?);
         let uncompressed_size = u64::from(reader.read_u32::<LE>()?);
         let flags = reader.read_u32::<LE>()?;
 
-        Ok(BlockTableEntry {
+        Ok(BlockEntry {
             file_pos,
             compressed_size,
             uncompressed_size,
@@ -222,10 +222,10 @@ pub(crate) struct SectorOffsets {
 
 impl SectorOffsets {
     pub fn from_reader<R>(
-        seeker: &mut MpqSeeker<R>,
-        block_entry: &BlockTableEntry,
+        seeker: &mut Seeker<R>,
+        block_entry: &BlockEntry,
         encryption_key: Option<u32>,
-    ) -> Result<SectorOffsets, MpqError>
+    ) -> Result<SectorOffsets, Error>
     where
         R: Read + Seek,
     {

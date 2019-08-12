@@ -1,6 +1,6 @@
 use std::borrow::Cow;
 
-use byte_slice_cast::*;
+use byte_slice_cast::AsMutSliceOf;
 use lazy_static::lazy_static;
 
 use super::consts::*;
@@ -160,7 +160,7 @@ pub fn decode_mpq_block(
     input: &[u8],
     uncompressed_size: u64,
     encryption_key: Option<u32>,
-) -> Result<Cow<[u8]>, MpqError> {
+) -> Result<Cow<[u8]>, Error> {
     let compressed_size = input.len() as u64;
     let mut buf = Cow::Borrowed(input);
 
@@ -172,25 +172,25 @@ pub fn decode_mpq_block(
         let compression_type = buf[0];
 
         if compression_type & COMPRESSION_IMA_ADPCM_MONO_MONO != 0 {
-            return Err(MpqError::UnsupportedCompression {
+            return Err(Error::UnsupportedCompression {
                 kind: "IMA ADCPM Mono".to_string(),
             });
         }
 
         if compression_type & COMPRESSION_IMA_ADPCM_MONO_STEREO != 0 {
-            return Err(MpqError::UnsupportedCompression {
+            return Err(Error::UnsupportedCompression {
                 kind: "IMA ADCPM Stereo".to_string(),
             });
         }
 
         if compression_type & COMPRESSION_HUFFMAN != 0 {
-            return Err(MpqError::UnsupportedCompression {
+            return Err(Error::UnsupportedCompression {
                 kind: "Huffman".to_string(),
             });
         }
 
         if compression_type & COMPRESSION_PKWARE != 0 {
-            return Err(MpqError::UnsupportedCompression {
+            return Err(Error::UnsupportedCompression {
                 kind: "PKWare DCL".to_string(),
             });
         }
@@ -201,7 +201,7 @@ pub fn decode_mpq_block(
             let status = decompressor.decompress(&buf[1..], &mut decompressed);
 
             if !(status.is_ok() && status.unwrap() == bzip2::Status::Ok) {
-                return Err(MpqError::Corrupted);
+                return Err(Error::Corrupted);
             }
 
             decompressed.resize(decompressor.total_out() as usize, 0);
@@ -218,7 +218,7 @@ pub fn decode_mpq_block(
             );
 
             if !(status.is_ok() && status.unwrap() != flate2::Status::BufError) {
-                return Err(MpqError::Corrupted);
+                return Err(Error::Corrupted);
             }
 
             decompressed.resize(decompressor.total_out() as usize, 0);
@@ -253,7 +253,6 @@ pub fn compress_mpq_block(input: &[u8]) -> Cow<[u8]> {
         Cow::Owned(compressed)
     }
 }
-
 
 pub fn sector_count_from_size(size: u64, sector_count: u64) -> u64 {
     ((size - 1) / sector_count) + 1

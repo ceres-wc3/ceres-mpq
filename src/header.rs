@@ -4,10 +4,10 @@ use std::io::{Read, Write};
 use byteorder::{ReadBytesExt, WriteBytesExt, LE};
 
 use super::consts::*;
-use super::error::MpqError;
+use super::error::Error;
 
 #[derive(Debug)]
-pub(crate) struct MpqFileHeader {
+pub(crate) struct FileHeader {
     pub header_size: u32,
     pub archive_size: u32,
     pub format_version: u16,
@@ -18,7 +18,7 @@ pub(crate) struct MpqFileHeader {
     pub block_table_entries: u32,
 }
 
-impl MpqFileHeader {
+impl FileHeader {
     pub fn new_v1(
         archive_size: u32,
         block_size: u32,
@@ -26,7 +26,7 @@ impl MpqFileHeader {
         block_table_offset: u32,
         hash_table_entries: u32,
         block_table_entries: u32,
-    ) -> MpqFileHeader {
+    ) -> FileHeader {
         let mut block_size = block_size / 512;
         let mut pow = 1;
         while block_size > 1 {
@@ -34,7 +34,7 @@ impl MpqFileHeader {
             pow += 1;
         }
 
-        MpqFileHeader {
+        FileHeader {
             format_version: 0,
             header_size: HEADER_MPQ_SIZE as u32,
             archive_size,
@@ -46,7 +46,7 @@ impl MpqFileHeader {
         }
     }
 
-    pub fn from_reader<R: Read>(mut reader: R) -> Result<MpqFileHeader, MpqError> {
+    pub fn from_reader<R: Read>(mut reader: R) -> Result<FileHeader, Error> {
         let header_size = reader.read_u32::<LE>()?;
         let archive_size = reader.read_u32::<LE>()?;
         let format_version = reader.read_u16::<LE>()?;
@@ -57,10 +57,10 @@ impl MpqFileHeader {
         let block_table_entries = reader.read_u32::<LE>()?;
 
         if format_version != 0 {
-            return Err(MpqError::UnsupportedVersion);
+            return Err(Error::UnsupportedVersion);
         }
 
-        Ok(MpqFileHeader {
+        Ok(FileHeader {
             header_size,
             archive_size,
             format_version,
@@ -88,17 +88,17 @@ impl MpqFileHeader {
 }
 
 #[derive(Debug)]
-pub struct MpqUserHeader {
+pub struct UserHeader {
     pub(crate) user_data_size: u32,
     pub(crate) file_header_offset: u32,
 }
 
-impl MpqUserHeader {
-    pub fn new<R: Read>(mut reader: R) -> Result<MpqUserHeader, MpqError> {
+impl UserHeader {
+    pub fn new<R: Read>(mut reader: R) -> Result<UserHeader, Error> {
         let user_data_size = reader.read_u32::<LE>()?;
         let file_header_offset = reader.read_u32::<LE>()?;
 
-        Ok(MpqUserHeader {
+        Ok(UserHeader {
             user_data_size,
             file_header_offset,
         })

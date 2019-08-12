@@ -1,7 +1,7 @@
 [package]
-name = "mpqer"
+name = "ceres-mpq"
 version = "0.1.0"
-authors = ["mori"]
+authors = ["ElusiveMori <mori@reu.moe>"]
 edition = "2018"
 
 [profile.release]
@@ -18,3 +18,10 @@ byte-slice-cast = "0.3"
 flate2 = "1"
 bzip2 = "0.3"
 indexmap = "1"
+
+[workspace]
+members = ["tool"]
+default-members = ["tool"]
+
+[patch.crates-io]
+ceres-mpq = {path = "./"}
