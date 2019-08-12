@@ -8,9 +8,9 @@ use super::util::*;
 
 #[derive(Debug)]
 /// Implementation of a MoPaQ archive viewer.
-/// 
+///
 /// Refer to top-level documentation to see which features are supported.
-/// 
+///
 /// Will work on any reader that implements `Read + Seek`.
 pub struct Archive<R: Read + Seek> {
     seeker: Seeker<R>,
@@ -20,16 +20,16 @@ pub struct Archive<R: Read + Seek> {
 
 impl<R: Read + Seek> Archive<R> {
     /// Try to open an MPQ archive from the specified `reader`.
-    /// 
+    ///
     /// Immediately, this will perform the following:
-    /// 
+    ///
     /// 1. Locate an MPQ header.
     /// 2. Locate and read the Hash Table.
     /// 3. Locate and read the Block Table.
-    /// 
+    ///
     /// If any of these steps fail, the archive is deemed corrupted and
     /// an appropriate error is returned.
-    /// 
+    ///
     /// No other operations will be performed.
     pub fn open(reader: R) -> Result<Archive<R>, Error> {
         let mut seeker = Seeker::new(reader)?;
@@ -44,12 +44,12 @@ impl<R: Read + Seek> Archive<R> {
         })
     }
 
-    /// Read a file's contents. 
-    /// 
+    /// Read a file's contents.
+    ///
     /// Notably, the filename resolution algorithm
     /// is case-insensitive, and will treat backslashes (`\`) and forward slashes (`/`)
     /// as the same character.
-    /// 
+    ///
     /// Does not support single-unit files or uncompressed files.
     pub fn read_file(&mut self, name: &str) -> Result<Vec<u8>, Error> {
         // find the hash entry and use it to find the block entry
@@ -90,23 +90,26 @@ impl<R: Read + Seek> Archive<R> {
 
         let mut result = Vec::with_capacity(block_entry.uncompressed_size as usize);
 
+        let sector_size = self.seeker.info().sector_size;
+        let sector_count = sector_offsets.count();
         let first_sector_offset = sector_offsets.one(0).unwrap().0;
-        for i in 0..sector_offsets.count() {
+        for i in 0..sector_count {
             let sector_offset = sector_offsets.one(i).unwrap();
             let slice_start = (sector_offset.0 - first_sector_offset) as usize;
             let slice_end = slice_start + sector_offset.1 as usize;
 
             // if this is the last sector, then its size will be less than
             // one archive sector size, so account for that
-            let uncompressed_size = if (i + 1) == sector_offsets.count() {
-                let mut size = block_entry.uncompressed_size % self.seeker.info().sector_size;
+            let uncompressed_size = if (i + 1) == sector_count {
+                let size = block_entry.uncompressed_size % sector_size;
 
                 if size == 0 {
-                    size = self.seeker.info().sector_size
+                    sector_size
+                } else {
+                    size
                 }
-                size
             } else {
-                self.seeker.info().sector_size
+                sector_size
             };
 
             // decode the block and append it to the final result buffer

@@ -61,7 +61,7 @@ impl FileRecord {
 #[derive(Debug, Clone, Copy)]
 /// Represents various options that can be used when adding a file to an archive.
 pub struct FileOptions {
-    /// Whether to encrypt the file using MPQ's encryption scheme. 
+    /// Whether to encrypt the file using MPQ's encryption scheme.
     /// The encryption key is derived from the file name, so in practice
     /// this is pretty useless.
     pub encrypt: bool,
@@ -106,10 +106,10 @@ impl FileOptions {
 
 #[derive(Debug)]
 /// Creator capable of creating MPQ Version 1 archives.
-/// 
+///
 /// Will hold all the files in memory until asked to [write](struct.Creator.html#method.write) them
 /// to a `writer`.
-/// 
+///
 /// When writing, a `(listfile)` will be automatically appended to the archive.
 // TODO: Add support for multiple compression types
 pub struct Creator {
@@ -429,8 +429,16 @@ where
 }
 
 pub fn test_builder() {
-    println!("normal: {}, {}", hash_string(b"ABCD/AB", 0), hash_string(b"ABCD\\AB", 0));
-    println!("noslash: {}, {}", hash_string_noslash(b"ABCD/AB", 0), hash_string_noslash(b"ABCD\\AB", 0));
+    println!(
+        "normal: {}, {}",
+        hash_string(b"ABCD/AB", 0),
+        hash_string(b"ABCD\\AB", 0)
+    );
+    println!(
+        "noslash: {}, {}",
+        hash_string_noslash(b"ABCD/AB", 0),
+        hash_string_noslash(b"ABCD\\AB", 0)
+    );
 
     // use std::fs::File;
     // use std::io::BufWriter;
