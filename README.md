@@ -8,4 +8,4 @@ For more details and the list of supported/unsupported features, please refer to
 
 # Command-line
 
-This repository also contains a command-line interface to the library, `mpqtool`. Currently, it is WIP.
+There is a command-line utility for reading, viewing, and writing MPQ files, which you can find here: [ceres-mpqtool](https://github.com/ElusiveMori/ceres-mpqtool)

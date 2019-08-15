@@ -13,10 +13,3 @@ byte-slice-cast = "0.3.2"
 flate2 = "1.0.9"
 bzip2 = "0.3.3"
 indexmap = "1.0.2"
-
-[workspace]
-members = ["tool"]
-default-members = ["tool"]
-
-[patch.crates-io]
-ceres-mpq = {path = "./"}
