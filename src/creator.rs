@@ -427,39 +427,3 @@ where
         Ok(())
     }
 }
-
-pub fn test_builder() {
-    println!(
-        "normal: {}, {}",
-        hash_string(b"ABCD/AB", 0),
-        hash_string(b"ABCD\\AB", 0)
-    );
-    println!(
-        "noslash: {}, {}",
-        hash_string_noslash(b"ABCD/AB", 0),
-        hash_string_noslash(b"ABCD\\AB", 0)
-    );
-
-    // use std::fs::File;
-    // use std::io::BufWriter;
-
-    // let mut builder = Creator::default();
-    // let out_file = File::create("out.w3x").unwrap();
-    // let mut out_file = BufWriter::new(out_file);
-
-    // let options = FileOptions {
-    //     compress: true,
-    //     encrypt: true,
-    //     adjust_key: true,
-    // };
-
-    // let huge = vec![0xffu8; 0x0010_0000];
-
-    // for i in 0..1024 {
-    //     builder.add_file(&format!("part{}", i), huge.as_slice(), options);
-    // }
-
-    // builder.write(&mut out_file).unwrap();
-
-    // out_file.flush().unwrap();
-}

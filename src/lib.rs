@@ -69,8 +69,6 @@
 //! # }
 //! ```
 
-#![allow(dead_code)]
-
 pub(crate) mod consts;
 pub(crate) mod header;
 pub(crate) mod seeker;
