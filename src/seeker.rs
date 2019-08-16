@@ -43,6 +43,10 @@ impl<R: Read + Seek> Seeker<R> {
 
         Ok(buf)
     }
+
+    pub(crate) fn reader(&mut self) -> &mut R {
+        &mut self.reader
+    }
 }
 
 #[derive(Debug, Copy, Clone)]

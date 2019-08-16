@@ -1,4 +1,3 @@
-use std::fs;
 use std::io::{Read, Seek};
 
 use super::error::*;
@@ -150,5 +149,26 @@ impl<R: Read + Seek> Archive<R> {
         }
 
         Some(list)
+    }
+
+    // Returns the start of the archive in the reader, which is the MPQ header,
+    // relative to the beginning of the reader.
+    pub fn start(&self) -> u64 {
+        self.seeker.info().header_offset
+    }
+
+    // Returns the end of the archive in the reader, relative to the beginning of the reader.
+    pub fn end(&self) -> u64 {
+        self.seeker.info().header_offset + self.seeker.info().archive_size
+    }
+
+    // Returns the size of the archive as specified in the MPQ header.
+    pub fn size(&self) -> u64 {
+        self.seeker.info().archive_size        
+    }
+
+    // Returns a mutable reference to the underlying reader.
+    pub fn reader(&mut self) -> &mut R {
+        self.seeker.reader()
     }
 }
