@@ -29,7 +29,7 @@ impl FileHeader {
     ) -> FileHeader {
         let mut block_size = block_size / 512;
         let mut pow = 1;
-        while block_size > 1 {
+        while block_size > 2 {
             block_size /= 2;
             pow += 1;
         }

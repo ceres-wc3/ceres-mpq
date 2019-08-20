@@ -130,16 +130,14 @@ impl Default for Creator {
 impl Creator {
     /// Adds a file to be later written to the archive.
     ///
-    /// Notably, the filename resolution algorithm
-    /// is case-insensitive, and will treat backslashes (`\`) and forward slashes (`/`)
-    /// as the same character.
-    ///
-    /// [`FileOptions`](struct.FileOptions.html) determine how exactly to add the file.
+    /// All forward slashes (`/`) in the file path will be auto-converted to backward slashes (`\`)
+    /// 
+    /// [`FileOptions`](struct.FileOptions.html) determine the options for adding the file, e.g. encryption and compression.
     pub fn add_file<C>(&mut self, file_name: &str, contents: C, options: FileOptions)
     where
         C: Into<Vec<u8>>,
     {
-        let key = FileKey::new(file_name);
+        let key = FileKey::new(&file_name);
 
         self.added_files
             .entry(key)
@@ -180,7 +178,7 @@ impl Creator {
         // create a listfile
         let mut listfile = String::new();
         for file in added_files.values() {
-            listfile += &file.file_name.replace("\\", "/");
+            listfile += &file.file_name.replace("/", "\\");
             listfile += "\r\n";
         }
 
