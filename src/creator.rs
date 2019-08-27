@@ -155,15 +155,15 @@ impl Creator {
     /// - All files with their sector offset table
     /// - MPQ hash table
     /// - MPQ block table
-    pub fn write<W>(self, mut writer: W) -> Result<(), IoError>
+    pub fn write<W>(&mut self, mut writer: W) -> Result<(), IoError>
     where
         W: Write + Seek,
     {
-        let (mut added_files, sector_size) = match self {
+        let (added_files, sector_size) = match self {
             Creator {
                 added_files,
                 sector_size,
-            } => (added_files, sector_size),
+            } => (added_files, *sector_size),
         };
 
         let current_pos = writer.seek(SeekFrom::Current(0))?;
