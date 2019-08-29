@@ -140,8 +140,7 @@ impl Creator {
         let key = FileKey::new(&file_name);
 
         self.added_files
-            .entry(key)
-            .or_insert_with(|| FileRecord::new(file_name, contents, options));
+            .insert(key, FileRecord::new(file_name, contents, options));
     }
 
     /// Writes out the entire archive to the specified writer.

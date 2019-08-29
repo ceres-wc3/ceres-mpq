@@ -1,3 +1,7 @@
+# 0.1.4
+
+* `Creator.add_file()` now replaces an entry if one already exists at the given path
+
 # 0.1.3
 
 * `Creator.write()` now takes `self` by mutable reference instead of by value
