@@ -241,8 +241,15 @@ where
     let hash_index_mask = hashtable_size - 1;
 
     for (block_index, (key, _)) in added_files.iter().enumerate() {
-        let hash_index = (key.index as usize) & hash_index_mask;
+        let mut hash_index = (key.index as usize) & hash_index_mask;
         let hash_entry = HashEntry::new(key.hash_a, key.hash_b, block_index as u32);
+
+        while !hashtable[hash_index].is_blank() {
+            hash_index += 1;
+            if hash_index == hashtable_size {
+                hash_index = 0;
+            }
+        }
 
         hashtable[hash_index] = hash_entry;
     }

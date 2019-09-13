@@ -1,3 +1,7 @@
+# 0.1.5
+
+* Fixed a bug where hashtable collision was not properly handled when creating new archives, resulting in files missing from the archive
+
 # 0.1.4
 
 * `Creator.add_file()` now replaces an entry if one already exists at the given path
