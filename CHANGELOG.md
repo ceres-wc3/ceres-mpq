@@ -1,3 +1,7 @@
+# 0.1.6
+
+* Fixed a bug where path hashing was incorrectly slash-insensitive, whereas it must be slash-sensitive
+
 # 0.1.5
 
 * Fixed a bug where hashtable collision was not properly handled when creating new archives, resulting in files missing from the archive

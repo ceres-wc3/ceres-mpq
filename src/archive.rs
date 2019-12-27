@@ -164,7 +164,7 @@ impl<R: Read + Seek> Archive<R> {
 
     // Returns the size of the archive as specified in the MPQ header.
     pub fn size(&self) -> u64 {
-        self.seeker.info().archive_size        
+        self.seeker.info().archive_size
     }
 
     // Returns a mutable reference to the underlying reader.

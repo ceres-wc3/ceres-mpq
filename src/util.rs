@@ -52,12 +52,12 @@ fn hash_string_with_table(source: &[u8], hash_type: u32, lookup: &[u8]) -> u32 {
 }
 
 pub fn hash_string(source: &[u8], hash_type: u32) -> u32 {
-    hash_string_with_table(source, hash_type, &ASCII_UPPER_LOOKUP)
+    hash_string_with_table(source, hash_type, &ASCII_UPPER_LOOKUP_SLASH_SENSITIVE)
 }
 
-pub fn hash_string_noslash(source: &[u8], hash_type: u32) -> u32 {
-    hash_string_with_table(source, hash_type, &ASCII_UPPER_LOOKUP_NOSLASH)
-}
+//pub fn hash_string_slash_sensitive(source: &[u8], hash_type: u32) -> u32 {
+//    hash_string_with_table(source, hash_type, &ASCII_UPPER_LOOKUP_SLASH_SENSITIVE)
+//}
 
 pub fn decrypt_mpq_block(data: &mut [u8], mut key: u32) {
     let iterations = data.len() >> 2;

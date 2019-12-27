@@ -131,7 +131,7 @@ impl Creator {
     /// Adds a file to be later written to the archive.
     ///
     /// All forward slashes (`/`) in the file path will be auto-converted to backward slashes (`\`)
-    /// 
+    ///
     /// [`FileOptions`](struct.FileOptions.html) determine the options for adding the file, e.g. encryption and compression.
     pub fn add_file<C>(&mut self, file_name: &str, contents: C, options: FileOptions)
     where
