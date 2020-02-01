@@ -46,8 +46,8 @@ impl<R: Read + Seek> Archive<R> {
     /// Read a file's contents.
     ///
     /// Notably, the filename resolution algorithm
-    /// is case-insensitive, and will treat backslashes (`\`) and forward slashes (`/`)
-    /// as the same character.
+    /// is case, and will treat backslashes (`\`) and forward slashes (`/`)
+    /// as different characters.
     ///
     /// Does not support single-unit files or uncompressed files.
     pub fn read_file(&mut self, name: &str) -> Result<Vec<u8>, Error> {

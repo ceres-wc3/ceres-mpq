@@ -1,3 +1,7 @@
+# 0.1.7
+
+* Fixed another bug where file paths would not be auto-converted to forward slashes...
+
 # 0.1.6
 
 * Fixed a bug where path hashing was incorrectly slash-insensitive, whereas it must be slash-sensitive

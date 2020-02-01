@@ -137,6 +137,7 @@ impl Creator {
     where
         C: Into<Vec<u8>>,
     {
+        let file_name = file_name.replace('/', "\\");
         let key = FileKey::new(&file_name);
 
         self.added_files
@@ -177,7 +178,7 @@ impl Creator {
         // create a listfile
         let mut listfile = String::new();
         for file in added_files.values() {
-            listfile += &file.file_name.replace("/", "\\");
+            listfile += &file.file_name;
             listfile += "\r\n";
         }
 
