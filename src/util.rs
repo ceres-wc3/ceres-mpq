@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use byte_slice_cast::AsMutSliceOf;
+
 use lazy_static::lazy_static;
 
 use super::consts::*;
@@ -255,5 +256,9 @@ pub fn compress_mpq_block(input: &[u8]) -> Cow<[u8]> {
 }
 
 pub fn sector_count_from_size(size: u64, sector_count: u64) -> u64 {
-    ((size - 1) / sector_count) + 1
+    if size == 0 {
+        1
+    } else {
+        ((size - 1) / sector_count) + 1
+    }
 }
