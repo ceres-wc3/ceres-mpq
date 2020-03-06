@@ -16,7 +16,7 @@ travis-ci = { repository = "ElusiveMori/ceres-mpq", branch = "master" }
 [dependencies]
 byteorder = "1.3.2"
 lazy_static = "1.3.0"
-err-derive = "0.1.5"
+err-derive = "0.2.3"
 byte-slice-cast = "0.3.2"
 flate2 = "1.0.9"
 bzip2 = "0.3.3"
