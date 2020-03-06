@@ -1,3 +1,7 @@
+# 0.1.9
+
+* Update broken dependency on `err-derive`.
+
 # 0.1.8
 
 * Fixed a panic when adding empty files.
